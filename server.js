@@ -25,7 +25,7 @@ app.get("/sw.js", (req, res) => {
 app.get("/icon.svg", (req, res) => {
   res.sendFile(path.join(process.cwd(), "icon.svg"));
 });
-const cache = new Map();
+const inflight = new Map();
 const settings = {
   riskPerTrade: Number(process.env.RISK_PER_TRADE || 0.005),
   maxDailyLossR: Number(process.env.MAX_DAILY_LOSS_R || 3),
@@ -55,20 +55,123 @@ async function av(params){
   if(j.Note||j.Information||j["Error Message"]) throw new Error(j.Note||j.Information||j["Error Message"]);
   return j;
 }
-function rowsFrom(j, interval){
-  const key=interval==="daily"?"Time Series FX (Daily)":`Time Series FX (${interval})`;
-  const raw=j[key]; if(!raw) throw new Error("No candles returned for "+interval);
-  return Object.entries(raw).map(([date,v])=>({date,open:+v["1. open"],high:+v["2. high"],low:+v["3. low"],close:+v["4. close"]}))
-    .sort((a,b)=>a.date.localeCompare(b.date));
+function tdSymbol(pair){
+  return `${pair.slice(0,3)}/${pair.slice(3)}`;
 }
-async function candles(pair,tf){
-  const key=pair+tf, hit=cache.get(key);
-  if(hit && Date.now()-hit.t<45000) return hit.rows;
-  const j=tf==="d1"
-    ?await av({function:"FX_DAILY",from_symbol:pair.slice(0,3),to_symbol:pair.slice(3),outputsize:"full"})
-    :await av({function:"FX_INTRADAY",from_symbol:pair.slice(0,3),to_symbol:pair.slice(3),interval:TF[tf],outputsize:"full"});
-  const rows=rowsFrom(j,TF[tf]); cache.set(key,{t:Date.now(),rows}); return rows;
+
+function rowsFromTwelveData(j){
+  if(j.status === "error"){
+    throw new Error(j.message || "Twelve Data returned an error");
+  }
+
+  if(!Array.isArray(j.values) || !j.values.length){
+    throw new Error("No candles returned from Twelve Data");
+  }
+
+  return j.values
+    .map(x => ({
+      date: String(x.datetime).replace("T", " "),
+      open: Number(x.open),
+      high: Number(x.high),
+      low: Number(x.low),
+      close: Number(x.close)
+    }))
+    .filter(x =>
+      Number.isFinite(x.open) &&
+      Number.isFinite(x.high) &&
+      Number.isFinite(x.low) &&
+      Number.isFinite(x.close)
+    )
+    .sort((a,b) => a.date.localeCompare(b.date));
 }
+
+async function twelveData(params){
+  const key = process.env.TWELVE_DATA_API_KEY;
+
+  if(!key){
+    throw new Error("Missing TWELVE_DATA_API_KEY");
+  }
+
+  const url =
+    "https://api.twelvedata.com/time_series?" +
+    new URLSearchParams({
+      ...params,
+      apikey: key
+    });
+
+  const r = await fetch(url);
+
+  if(!r.ok){
+    throw new Error(`Twelve Data HTTP ${r.status}`);
+  }
+
+  const j = await r.json();
+
+  if(j.status === "error"){
+    throw new Error(j.message || "Twelve Data API error");
+  }
+
+  return j;
+}
+
+async function cachedRequest(key, loader, ttl = 60000){
+  const hit = cache.get(key);
+
+  if(hit && Date.now() - hit.t < ttl){
+    return hit.rows;
+  }
+
+  if(inflight.has(key)){
+    return inflight.get(key);
+  }
+
+  const promise = (async () => {
+    const rows = await loader();
+
+    cache.set(key, {
+      t: Date.now(),
+      rows
+    });
+
+    return rows;
+  })();
+
+  inflight.set(key, promise);
+
+  try{
+    return await promise;
+  }finally{
+    inflight.delete(key);
+  }
+}
+
+async function candles(pair, tf){
+  const intervals = {
+    m5: "5min",
+    m15: "15min",
+    h1: "1h",
+    d1: "1day"
+  };
+
+  if(!intervals[tf]){
+    throw new Error("Unsupported timeframe: " + tf);
+  }
+
+  return cachedRequest(
+    `td:${pair}:${tf}`,
+    async () => {
+      const j = await twelveData({
+        symbol: tdSymbol(pair),
+        interval: intervals[tf],
+        outputsize: "5000"
+      });
+
+      return rowsFromTwelveData(j);
+    },
+    60000
+  );
+}
+
 function aggregate(r, minutes){
   if(!r.length) return [];
   const out=[];
@@ -190,11 +293,43 @@ function buildSignal(all,newsRisk=false){
   return {direction:master,alignment:{buy,sell,matchingTimeframes:aligned},timeframes:v,entry:p,stopLoss:stop,takeProfit1:tp1,takeProfit2:tp2,riskReward:master==="NO TRADE"?null:2,newsBlocked:newsRisk};
 }
 async function news(pair){
-  const ticker=`FOREX:${pair.slice(0,3)},FOREX:${pair.slice(3)}`;
-  const j=await av({function:"NEWS_SENTIMENT",tickers:ticker,limit:"30",sort:"LATEST"});
-  return (j.feed||[]).slice(0,20).map(x=>({title:x.title,url:x.url,time:x.time_published,source:x.source,summary:x.summary,sentiment:x.overall_sentiment_label}));
+  const key = "news:" + pair;
+
+  const hit = cache.get(key);
+
+  if(hit && Date.now() - hit.t < 300000){
+    return hit.rows;
+  }
+
+  const ticker =
+    `FOREX:${pair.slice(0,3)},FOREX:${pair.slice(3)}`;
+
+  const j = await av({
+    function: "NEWS_SENTIMENT",
+    tickers: ticker,
+    limit: "30",
+    sort: "LATEST"
+  });
+
+  const rows = (j.feed || [])
+    .slice(0,20)
+    .map(x => ({
+      title: x.title,
+      url: x.url,
+      time: x.time_published,
+      source: x.source,
+      summary: x.summary,
+      sentiment: x.overall_sentiment_label
+    }));
+
+  cache.set(key, {
+    t: Date.now(),
+    rows
+  });
+
+  return rows;
 }
-function newsIsRisky(items){
+unctiononen newsIsRisky(items){
   const now=Date.now(), win=settings.newsBlockMinutes*60000;
   return items.some(x=>{
     const m=String(x.time||"").match(/^(\d{8})T(\d{6})/);
