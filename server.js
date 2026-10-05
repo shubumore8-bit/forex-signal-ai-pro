@@ -412,7 +412,37 @@ app.get("/api/analyze",async(req,res)=>{
   const h4=aggregate(h1,240);
   const all={m5,m15,h1,h4,d1}, risky=newsIsRisky(newsItems);
   const sessionAllowed=sessionState(m5.at(-1)?.date||h1.at(-1)?.date||new Date().toISOString());
-  const signal=buildSignal(all,risky || !sessionAllowed);
+  const currentSignal=buildSignal(all,false);
+
+const h1Key=`${pair}:${h1.at(-1)?.date || ""}`;
+
+let locked=signalCache.get(h1Key);
+
+if(!locked){
+  locked={
+    direction:currentSignal.direction,
+    entry:currentSignal.entry,
+    stopLoss:currentSignal.stopLoss,
+    takeProfit1:currentSignal.takeProfit1,
+    takeProfit2:currentSignal.takeProfit2,
+    riskReward:currentSignal.riskReward
+  };
+
+  signalCache.set(h1Key,locked);
+}
+
+const blocked=risky || !sessionAllowed;
+
+const signal={
+  ...currentSignal,
+  ...locked,
+  direction:blocked?"NO TRADE":locked.direction,
+  stopLoss:blocked?null:locked.stopLoss,
+  takeProfit1:blocked?null:locked.takeProfit1,
+  takeProfit2:blocked?null:locked.takeProfit2,
+  riskReward:blocked?null:locked.riskReward,
+  newsBlocked:risky
+};
   res.json({pair,generatedAt:new Date().toISOString(),settings,sessionAllowed,signal,newsRisk:risky,news:newsItems.slice(0,8)});
  }catch(e){res.status(500).json({error:e.message})}
 });
