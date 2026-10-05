@@ -329,7 +329,7 @@ async function news(pair){
 
   return rows;
 }
-unctiononen newsIsRisky(items){
+function newsIsRisky(items){
   const now=Date.now(), win=settings.newsBlockMinutes*60000;
   return items.some(x=>{
     const m=String(x.time||"").match(/^(\d{8})T(\d{6})/);
