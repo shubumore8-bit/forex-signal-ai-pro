@@ -277,7 +277,15 @@ function scoreTf(r){
   if(s.bearishStructure){score-=2;reasons.push("Bearish swing structure")}
   if(s.sweepLow){score++;reasons.push("Liquidity low sweep")}
   if(s.sweepHigh){score--;reasons.push("Liquidity high sweep")}
-  return {direction:score>=3?"BUY":score<=-3?"SELL":"NO TRADE",score,confidence:Math.min(95,50+Math.abs(score)*7),reasons,indicators:i,structure:s,zones:zones(r)};
+  return {
+  direction:score>=4?"BUY":score<=-4?"SELL":"NO TRADE",
+  score,
+  confidence:Math.min(95,50+Math.abs(score)*7),
+  reasons,
+  indicators:i,
+  structure:s,
+  zones:zones(r)
+};
 }
 function buildSignal(all,newsRisk=false){
   const tfs=["d1","h4","h1","m15","m5"], v=tfs.map(tf=>({tf,...scoreTf(all[tf])}));
