@@ -27,7 +27,6 @@ app.get("/sw.js", (req, res) => {
 app.get("/icon.svg", (req, res) => {
   res.sendFile(path.join(process.cwd(), "icon.svg"));
 });
-const inflight = new Map();
 const settings = {
   riskPerTrade: Number(process.env.RISK_PER_TRADE || 0.005),
   maxDailyLossR: Number(process.env.MAX_DAILY_LOSS_R || 3),
