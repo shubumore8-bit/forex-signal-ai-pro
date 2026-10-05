@@ -292,7 +292,30 @@ function buildSignal(all,newsRisk=false){
   const higher=v.filter(x=>["d1","h4","h1"].includes(x.tf));
   const lower=v.filter(x=>["m15","m5"].includes(x.tf));
   const buy=higher.filter(x=>x.direction==="BUY").length, sell=higher.filter(x=>x.direction==="SELL").length;
-  let master=buy>=2&&lower.some(x=>x.direction==="BUY")?"BUY":sell>=2&&lower.some(x=>x.direction==="SELL")?"SELL":"NO TRADE";
+  const htfBuy = higher.filter(x => x.direction === "BUY").length;
+const htfSell = higher.filter(x => x.direction === "SELL").length;
+
+const h1Signal = v.find(x => x.tf === "h1");
+const h1Adx = h1Signal?.indicators?.adx ?? null;
+
+let master = "NO TRADE";
+
+if(
+  htfBuy === 3 &&
+  lower.some(x => x.direction === "BUY") &&
+  h1Adx !== null &&
+  h1Adx >= 20
+){
+  master = "BUY";
+}
+else if(
+  htfSell === 3 &&
+  lower.some(x => x.direction === "SELL") &&
+  h1Adx !== null &&
+  h1Adx >= 20
+){
+  master = "SELL";
+}
   if(newsRisk) master="NO TRADE";
   const base=scoreTf(all.h1);
 const A=base.indicators.atr;
