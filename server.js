@@ -323,42 +323,6 @@ async function news(pair){
 
   return rows;
 }
-  const key = "news:" + pair;
-
-  const hit = cache.get(key);
-
-  if(hit && Date.now() - hit.t < 300000){
-    return hit.rows;
-  }
-
-  const ticker =
-    `FOREX:${pair.slice(0,3)},FOREX:${pair.slice(3)}`;
-
-  const j = await av({
-    function: "NEWS_SENTIMENT",
-    tickers: ticker,
-    limit: "30",
-    sort: "LATEST"
-  });
-
-  const rows = (j.feed || [])
-    .slice(0,20)
-    .map(x => ({
-      title: x.title,
-      url: x.url,
-      time: x.time_published,
-      source: x.source,
-      summary: x.summary,
-      sentiment: x.overall_sentiment_label
-    }));
-
-  cache.set(key, {
-    t: Date.now(),
-    rows
-  });
-
-  return rows;
-}
 function newsIsRisky(items){
   const now=Date.now(), win=settings.newsBlockMinutes*60000;
   return items.some(x=>{
