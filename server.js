@@ -10,7 +10,21 @@ const JOURNAL_FILE = path.join(DATA_DIR, "journal.json");
 const PAPER_FILE = path.join(DATA_DIR, "paper.json");
 app.use(express.json({limit:"2mb"}));
 app.use(express.static("public"));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(process.cwd(), "index.html"));
+});
 
+app.get("/manifest.webmanifest", (req, res) => {
+  res.sendFile(path.join(process.cwd(), "manifest.webmanifest"));
+});
+
+app.get("/sw.js", (req, res) => {
+  res.sendFile(path.join(process.cwd(), "sw.js"));
+});
+
+app.get("/icon.svg", (req, res) => {
+  res.sendFile(path.join(process.cwd(), "icon.svg"));
+});
 const cache = new Map();
 const settings = {
   riskPerTrade: Number(process.env.RISK_PER_TRADE || 0.005),
