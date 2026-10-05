@@ -285,7 +285,9 @@ function buildSignal(all,newsRisk=false){
   const buy=higher.filter(x=>x.direction==="BUY").length, sell=higher.filter(x=>x.direction==="SELL").length;
   let master=buy>=2&&lower.some(x=>x.direction==="BUY")?"BUY":sell>=2&&lower.some(x=>x.direction==="SELL")?"SELL":"NO TRADE";
   if(newsRisk) master="NO TRADE";
-  const base=all.h1, A=base.indicators.atr, p=base.indicators.price;
+  const base=scoreTf(all.h1);
+const A=base.indicators.atr;
+const p=base.indicators.price;
   const slDist=A?1.5*A:null;
   const stop=master==="BUY"?p-slDist:master==="SELL"?p+slDist:null;
   const tp1=master==="BUY"?p+1.5*A:master==="SELL"?p-1.5*A:null;
