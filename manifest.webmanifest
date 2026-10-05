@@ -1,0 +1,18 @@
+{
+  "name": "Forex Signal AI Pro 5",
+  "short_name": "Forex AI",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#07101d",
+  "theme_color": "#07101d",
+  "description": "Mobile forex research and paper trading dashboard",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

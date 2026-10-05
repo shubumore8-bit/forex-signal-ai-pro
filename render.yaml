@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: forex-signal-ai-pro
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: ALPHAVANTAGE_API_KEY
+        sync: false
+      - key: RISK_PER_TRADE
+        value: "0.005"
+      - key: MAX_DAILY_LOSS_R
+        value: "3"
+      - key: NEWS_BLOCK_MINUTES
+        value: "60"
+      - key: SLIPPAGE_PIPS
+        value: "0.2"
+      - key: SPREAD_PIPS
+        value: "0.8"
+      - key: COMMISSION_PIPS
+        value: "0"
+      - key: SESSION
+        value: "LONDON_NEWYORK"
