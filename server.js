@@ -306,6 +306,24 @@ const p=base.indicators.price;
 }
 async function news(pair){
   const key = "news:" + pair;
+  const hit = cache.get(key);
+
+  if(hit && Date.now() - hit.t < 300000){
+    return hit.rows;
+  }
+
+  // Alpha Vantage disabled to avoid daily API limits.
+  // Return empty news list; technical signal remains available.
+  const rows = [];
+
+  cache.set(key,{
+    t:Date.now(),
+    rows
+  });
+
+  return rows;
+}
+  const key = "news:" + pair;
 
   const hit = cache.get(key);
 
