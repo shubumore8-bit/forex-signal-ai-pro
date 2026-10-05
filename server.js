@@ -4,6 +4,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 const app = express();
+const cache = new Map();
+const inflight = new Map();
 const PORT = Number(process.env.PORT || 3000);
 const DATA_DIR = path.join(process.cwd(), "data");
 const JOURNAL_FILE = path.join(DATA_DIR, "journal.json");
